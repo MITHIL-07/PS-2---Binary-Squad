@@ -1,1 +1,1 @@
-# PS-8---Binary-Squad
+#Binary-Squad
