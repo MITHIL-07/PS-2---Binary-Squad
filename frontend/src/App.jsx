@@ -667,7 +667,7 @@ function App() {
 
             <MapPin size={15} />
 
-            Gujarat â€¢ Ahmedabad
+            Gujarat • Ahmedabad
 
           </div>
 
@@ -1019,7 +1019,7 @@ function App() {
 
                   <strong>
 
-                    {loadingScore ? "â€¦" : Math.round(score)}
+                    {loadingScore ? "…" : Math.round(score)}
 
                   </strong>
 
