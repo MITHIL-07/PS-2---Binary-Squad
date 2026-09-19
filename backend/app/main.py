@@ -2,10 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.services.scoring import (
-    SiteFactors,
-    calculate_readiness,
-)
+from app.services.scoring import SiteFactors, calculate_readiness
+from app.api.sites import router as sites_router
 
 
 app = FastAPI(
@@ -13,7 +11,6 @@ app = FastAPI(
     description="AI-powered geospatial site readiness analyzer",
     version="0.1.0",
 )
-
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,3 +57,6 @@ def score_site(request: ScoreRequest):
     )
 
     return calculate_readiness(factors)
+
+
+app.include_router(sites_router)

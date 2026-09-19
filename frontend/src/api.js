@@ -7,6 +7,12 @@ export async function calculateSiteScore(factors) {
     `${API_BASE_URL}/api/score`,
     factors
   );
+  return response.data;
+}
 
+export async function getSites() {
+  const response = await axios.get(
+    `${API_BASE_URL}/api/sites`
+  );
   return response.data;
 }
