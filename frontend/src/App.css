@@ -640,3 +640,149 @@ button {
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
 }
 
+
+.ai-recommendation-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.ai-recommendation-category {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.ai-recommendation-score {
+  margin-top: 3px;
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ai-recommendation-score span {
+  margin-left: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.55;
+}
+
+.ai-recommendation-summary {
+  margin: 0 0 14px;
+  line-height: 1.55;
+}
+
+.ai-recommendation-section {
+  margin-top: 14px;
+}
+
+.ai-recommendation-section-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ai-recommendation-section ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.ai-recommendation-section li {
+  margin-bottom: 5px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+
+.site-comparison {
+  margin-top: 12px;
+}
+
+.comparison-subtitle {
+  margin-top: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.65;
+}
+
+.comparison-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.comparison-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 11px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: 0.18s ease;
+}
+
+.comparison-row:hover {
+  border-color: rgba(148, 163, 184, 0.38);
+  transform: translateY(-1px);
+}
+
+.comparison-row-active {
+  border-color: rgba(99, 102, 241, 0.55);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.comparison-site-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.comparison-site-info strong {
+  font-size: 13px;
+}
+
+.comparison-site-info span {
+  font-size: 10px;
+  opacity: 0.62;
+}
+
+.comparison-score {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.comparison-score strong {
+  font-size: 20px;
+}
+
+.comparison-score span {
+  font-size: 10px;
+  opacity: 0.55;
+}
+
+
+.comparison-loading {
+  padding: 14px 8px;
+  text-align: center;
+  font-size: 12px;
+  opacity: 0.6;
+}
+

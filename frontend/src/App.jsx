@@ -28,11 +28,14 @@ import {
 
 } from "lucide-react";
 
-import { calculateSiteScore, getSites } from "./api";
+import {
+  getSites,
+  getH3Readiness,
+  getSiteRecommendation,
+  getSiteAnalyses,
+} from "./api";
 
 import "./App.css";
-
-
 
 const sites = [
 
@@ -134,8 +137,6 @@ const sites = [
 
 ];
 
-
-
 const layers = [
 
   {
@@ -190,8 +191,6 @@ const layers = [
 
 ];
 
-
-
 function App() {
 
   const mapContainer = useRef(null);
@@ -200,21 +199,42 @@ function App() {
 
   const markersRef = useRef([]);
 
-
-
   const [selectedId, setSelectedId] = useState("A");
 
   const [scoreData, setScoreData] = useState(null);
+  const [recommendation, setRecommendation] = useState(null);
+  const [loadingRecommendation, setLoadingRecommendation] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [siteAnalyses, setSiteAnalyses] = useState([]);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
 
   const [loadingScore, setLoadingScore] = useState(false);
   const [osmSites, setOsmSites] = useState({});
   const [osmLoading, setOsmLoading] = useState(true);
   const [osmError, setOsmError] = useState("");
 
-
   const [opacity, setOpacity] = useState(75);
+  const [h3Data, setH3Data] = useState(null);
+  const [h3Loading, setH3Loading] = useState(true);
+  const [showH3, setShowH3] = useState(true);
+  const [mapReady, setMapReady] = useState(false);
 
+  // Load H3 site-readiness GeoJSON from the backend.
+  useEffect(() => {
+    async function loadH3Readiness() {
+      try {
+        const data = await getH3Readiness();
 
+        setH3Data(data);
+      } catch (error) {
+        console.error("[H3] Failed to load readiness data:", error);
+      } finally {
+        setH3Loading(false);
+      }
+    }
+
+    loadH3Readiness();
+  }, []);
 
   const selectedSite = sites.find((site) => site.id === selectedId);
 
@@ -249,8 +269,6 @@ function App() {
 
   });
 
-
-
   // Create MapLibre map.
 
   useEffect(() => {
@@ -278,92 +296,240 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
 
+    async function loadSiteAnalyses() {
+      setComparisonLoading(true);
+
+      try {
+        const data = await getSiteAnalyses();
+
+        if (!cancelled) {
+          setSiteAnalyses(data?.sites ?? []);
+        }
+      } catch (error) {
+        console.error("Site comparison API error:", error);
+
+        if (!cancelled) {
+          setSiteAnalyses([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setComparisonLoading(false);
+        }
+      }
+    }
+
+    loadSiteAnalyses();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
 
-
-
     const map = new maplibregl.Map({
-
       container: mapContainer.current,
-
       style: {
+        version: 8,
 
-      version: 8,
-
-      sources: {
-
-        osm: {
-
-          type: "raster",
-
-          tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-
-          tileSize: 256,
-
-          attribution: "© OpenStreetMap contributors",
-
+        sources: {
+          osm: {
+            type: "raster",
+            tiles: [
+              "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+            ],
+            tileSize: 256,
+            attribution: "� OpenStreetMap contributors",
+          },
         },
 
+        layers: [
+          {
+            id: "osm",
+            type: "raster",
+            source: "osm",
+            paint: {
+              "raster-opacity": 1,
+            },
+          },
+        ],
       },
 
-      layers: [
-
-        {
-
-          id: "osm",
-
-          type: "raster",
-
-          source: "osm",
-
-          paint: {
-
-            "raster-opacity": 1,
-
-          },
-
-        },
-
-      ],
-
-    },
-
       center: [72.535, 23.035],
-
       zoom: 11.4,
-
     });
 
-
-
-    map.addControl(new maplibregl.NavigationControl(), "top-right");
-
-
+    map.addControl(
+      new maplibregl.NavigationControl(),
+      "top-right"
+    );
 
     map.on("load", () => {
-
       map.resize();
-
+      setMapReady(true);
     });
-
-
 
     mapRef.current = map;
 
-
-
     return () => {
-
       map.remove();
-
       mapRef.current = null;
-
     };
-
   }, []);
 
+  // Render H3 readiness after both API data and MapLibre are ready.
+  useEffect(() => {
+    const map = mapRef.current;
 
+    if (!map || !mapReady || !h3Data) {
+      return;
+    }
+
+    const renderH3 = () => {
+
+      if (!map.getSource("h3-readiness")) {
+
+        map.addSource("h3-readiness", {
+          type: "geojson",
+          data: h3Data,
+        });
+
+        map.addLayer({
+          id: "h3-readiness-fill",
+          type: "fill",
+          source: "h3-readiness",
+          paint: {
+            "fill-color": [
+              "step",
+              ["get", "readiness"],
+              "#ef4444",
+              30,
+              "#f59e0b",
+              70,
+              "#22c55e"
+            ],
+            "fill-opacity": 0.48
+          }
+        });
+
+        map.addLayer({
+          id: "h3-readiness-outline",
+          type: "line",
+          source: "h3-readiness",
+          paint: {
+            "line-color": "#ffffff",
+            "line-width": 0.8,
+            "line-opacity": 0.7
+          }
+        });
+
+        map.on("click", "h3-readiness-fill", (event) => {
+          const feature = event.features?.[0];
+
+          if (!feature) return;
+
+          const p = feature.properties;
+
+          new maplibregl.Popup()
+            .setLngLat(event.lngLat)
+            .setHTML(`
+              <div style="font-family: sans-serif; min-width: 190px;">
+                <strong>H3 Site Readiness</strong>
+                <div style="margin-top: 8px;">
+                  <b>Readiness:</b> ${p.readiness}
+                </div>
+                <div>
+                  <b>Category:</b> ${p.category}
+                </div>
+                <div>
+                  <b>POIs:</b> ${p.poi_count}
+                </div>
+                <div>
+                  <b>Commercial:</b> ${p.commercial_pois}
+                </div>
+                <div>
+                  <b>Demand Activity:</b> ${p.demand_activity_pois}
+                </div>
+              </div>
+            `)
+            .addTo(map);
+        });
+
+        map.on("mouseenter", "h3-readiness-fill", () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+
+        map.on("mouseleave", "h3-readiness-fill", () => {
+          map.getCanvas().style.cursor = "";
+        });
+
+        // Temporary diagnostic: force a highly visible color.
+        map.setPaintProperty(
+          "h3-readiness-fill",
+          "fill-color",
+          "#00ff00"
+        );
+        map.setPaintProperty(
+          "h3-readiness-fill",
+          "fill-opacity",
+          0.65
+        );
+
+        // Temporarily fit the map to the complete H3 dataset.
+        const coordinates = h3Data.features.flatMap(
+          (feature) =>
+            feature.geometry.coordinates[0]
+        );
+
+        const bounds = coordinates.reduce(
+          (bounds, coordinate) => {
+            return bounds.extend(coordinate);
+          },
+          new maplibregl.LngLatBounds(
+            coordinates[0],
+            coordinates[0]
+          )
+        );
+
+        map.fitBounds(bounds, {
+          padding: 40,
+          duration: 800,
+        });
+
+        map.once("idle", () => {
+          const rendered = map.queryRenderedFeatures({
+            layers: ["h3-readiness-fill"],
+          });
+
+          const source = map.getSource("h3-readiness");
+
+        });
+      } else {
+        map.getSource("h3-readiness").setData(h3Data);
+      }
+
+      map.setPaintProperty(
+        "h3-readiness-fill",
+        "fill-opacity",
+        showH3 ? 0.48 : 0
+      );
+
+      map.setPaintProperty(
+        "h3-readiness-outline",
+        "line-opacity",
+        showH3 ? 0.7 : 0
+      );
+    };
+
+    if (map.loaded()) {
+      renderH3();
+    } else {
+      map.once("load", renderH3);
+    }
+  }, [h3Data, mapReady, showH3]);
 
   // Update markers whenever the selected site changes.
 
@@ -371,13 +537,9 @@ function App() {
 
     if (!mapRef.current) return;
 
-
-
     markersRef.current.forEach((marker) => marker.remove());
 
     markersRef.current = [];
-
-
 
     sites.forEach((site) => {
 
@@ -387,15 +549,11 @@ function App() {
 
       element.style.cursor = "pointer";
 
-
-
       const score = site.id === selectedId && scoreData
 
         ? scoreData.score
 
         : null;
-
-
 
       element.innerHTML = `
 
@@ -409,13 +567,9 @@ function App() {
 
       `;
 
-
-
       element.addEventListener("click", () => {
 
         setSelectedId(site.id);
-
-
 
         if (mapRef.current) {
 
@@ -433,8 +587,6 @@ function App() {
 
       });
 
-
-
       const marker = new maplibregl.Marker({
 
         element,
@@ -445,15 +597,11 @@ function App() {
 
         .addTo(mapRef.current);
 
-
-
       markersRef.current.push(marker);
 
     });
 
   }, [selectedId, scoreData]);
-
-
 
   // Send selected site factors to FastAPI.
 
@@ -461,51 +609,77 @@ function App() {
 
     if (!selectedSite) return;
 
-
-
     let cancelled = false;
 
-
-
-    async function loadScore() {
+    async function loadScoreAndRecommendation() {
 
       setLoadingScore(true);
 
+      setLoadingRecommendation(true);
 
+      const factors = {
+
+        population: selectedSite.population,
+
+        accessibility: realAccessibility,
+
+        competition: 100 - realCompetitiveOpportunity,
+
+        land_use: selectedSite.land_use,
+
+        risk: selectedSite.risk,
+
+      };
 
       try {
 
-        const result = await calculateSiteScore({
+        const [analysisResult, recommendationResult] =
 
-          population: selectedSite.population,
+          await Promise.all([
 
-          accessibility: realAccessibility,
+            getSiteAnalyses(),
 
-          competition: 100 - realCompetitiveOpportunity,
+            getSiteRecommendation(factors),
 
-          land_use: selectedSite.land_use,
+          ]);
 
-          risk: selectedSite.risk,
+        const selectedAnalysis = analysisResult?.sites?.find(
 
-        });
+          (site) => site.id === selectedId
 
-
+        );
 
         if (!cancelled) {
 
-          setScoreData(result);
+          if (selectedAnalysis) {
+
+            setScoreData({
+
+              score: selectedAnalysis.score,
+
+              breakdown: selectedAnalysis.breakdown,
+
+            });
+
+          } else {
+
+            setScoreData(null);
+
+          }
+
+          setRecommendation(recommendationResult);
 
         }
 
       } catch (error) {
 
-        console.error("Score API error:", error);
-
-
+        console.error("Score/recommendation API error:", error);
 
         if (!cancelled) {
 
           setScoreData(null);
+
+          setRecommendation(null);
 
         }
 
@@ -515,17 +689,15 @@ function App() {
 
           setLoadingScore(false);
 
+          setLoadingRecommendation(false);
+
         }
 
       }
 
     }
 
-
-
-    loadScore();
-
-
+    loadScoreAndRecommendation();
 
     return () => {
 
@@ -534,8 +706,6 @@ function App() {
     };
 
   }, [selectedId, selectedSite]);
-
-
 
   const toggleLayer = (id) => {
 
@@ -549,13 +719,9 @@ function App() {
 
   };
 
-
-
   const score = scoreData?.score ?? 0;
 
   const breakdown = scoreData?.breakdown ?? {};
-
-
 
   const metrics = [
 
@@ -615,8 +781,6 @@ function App() {
 
   ];
 
-
-
   return (
 
     <div className="page">
@@ -643,8 +807,6 @@ function App() {
 
           </div>
 
-
-
           <div>
 
             <div className="brand-title">GeoReadiness AI</div>
@@ -659,8 +821,6 @@ function App() {
 
         </div>
 
-
-
         <div className="topbar-right">
 
           <div className="location-pill">
@@ -670,8 +830,6 @@ function App() {
             Gujarat • Ahmedabad
 
           </div>
-
-
 
           <div className="ai-status">
 
@@ -684,8 +842,6 @@ function App() {
         </div>
 
       </header>
-
-
 
       <main className="app">
 
@@ -701,11 +857,7 @@ function App() {
 
             </div>
 
-
-
             <h1>Find locations that are ready to win.</h1>
-
-
 
             <p>
 
@@ -716,8 +868,6 @@ function App() {
             </p>
 
           </div>
-
-
 
           <button
 
@@ -741,8 +891,6 @@ function App() {
 
         </section>
 
-
-
         <section className="dashboard-grid">
 
           <aside className="left-panel">
@@ -765,8 +913,6 @@ function App() {
 
               </div>
 
-
-
               <div className="layer-list">
 
                 {layers.map((layer) => (
@@ -780,8 +926,6 @@ function App() {
                       {layer.name}
 
                     </div>
-
-
 
                     <button
 
@@ -807,8 +951,6 @@ function App() {
 
               </div>
 
-
-
               <div className="opacity-control">
 
                 <div className="opacity-header">
@@ -818,8 +960,6 @@ function App() {
                   <span>{opacity}%</span>
 
                 </div>
-
-
 
                 <input
 
@@ -839,21 +979,15 @@ function App() {
 
             </div>
 
-
-
             <div className="panel">
 
               <div className="section-heading">Candidate sites</div>
-
-
 
               <div className="site-list">
 
                 {sites.map((site) => {
 
                   const active = site.id === selectedId;
-
-
 
                   return (
 
@@ -870,8 +1004,6 @@ function App() {
                       onClick={() => {
 
                         setSelectedId(site.id);
-
-
 
                         if (mapRef.current) {
 
@@ -899,8 +1031,6 @@ function App() {
 
                         </span>
 
-
-
                         <div>
 
                           <strong>{site.name}</strong>
@@ -910,8 +1040,6 @@ function App() {
                         </div>
 
                       </div>
-
-
 
                       <ChevronRight size={17} />
 
@@ -927,13 +1055,9 @@ function App() {
 
           </aside>
 
-
-
           <section className="map-panel">
 
             <div className="map-container" ref={mapContainer}></div>
-
-
 
             <div className="map-overlay">
 
@@ -945,8 +1069,6 @@ function App() {
 
               </div>
 
-
-
               <div className="map-status">
 
                 <Activity size={14} />
@@ -957,8 +1079,6 @@ function App() {
 
             </div>
 
-
-
             <div className="map-legend">
 
               <div>
@@ -968,8 +1088,6 @@ function App() {
                 Candidate
 
               </div>
-
-
 
               <div>
 
@@ -983,15 +1101,11 @@ function App() {
 
           </section>
 
-
-
           <aside className="right-panel">
 
             <div className="panel selected-site">
 
               <div className="section-heading">Selected site</div>
-
-
 
               <div className="location-pill">
 
@@ -1000,8 +1114,6 @@ function App() {
                 {selectedSite.name}
 
               </div>
-
-
 
               <div className="score-ring">
 
@@ -1029,8 +1141,6 @@ function App() {
 
               </div>
 
-
-
               <div className="metric-list">
 
                 {metrics.map((metric) => {
@@ -1038,8 +1148,6 @@ function App() {
                   const Icon = metric.icon;
 
                   const value = Math.round(metric.value);
-
-
 
                   return (
 
@@ -1055,13 +1163,9 @@ function App() {
 
                         </div>
 
-
-
                         <strong>{value}</strong>
 
                       </div>
-
-
 
                       <div className="metric-bar">
 
@@ -1077,19 +1181,120 @@ function App() {
 
               </div>
 
-
-
-              <button className="compare-button">
+              <button
+                className="compare-button"
+                onClick={() => setShowComparison((current) => !current)}
+              >
 
                 <Target size={16} />
 
-                Compare this site
+                {showComparison ? "Hide comparison" : "Compare this site"}
 
               </button>
 
             </div>
 
+            {showComparison && (
 
+              <div className="panel site-comparison">
+
+                <div className="explanation-title">
+
+                  <Target size={16} />
+
+                  Ahmedabad Site Comparison
+
+                </div>
+
+                <div className="comparison-subtitle">
+
+                  Compare the current candidate locations using the same readiness model.
+
+                </div>
+
+                <div className="comparison-list">
+
+                  {comparisonLoading ? (
+
+                    <div className="comparison-loading">
+
+                      Loading site analysis...
+
+                    </div>
+
+                  ) : siteAnalyses.length === 0 ? (
+
+                    <div className="comparison-loading">
+
+                      Site analysis data unavailable.
+
+                    </div>
+
+                  ) : (
+
+                    siteAnalyses.map((analysis) => (
+
+                      <button
+
+                        className={`comparison-row ${
+                          analysis.id === selectedId
+                            ? "comparison-row-active"
+                            : ""
+                        }`}
+
+                        key={analysis.id}
+
+                        onClick={() => {
+
+                          setSelectedId(analysis.id);
+
+                          setShowComparison(false);
+
+                          if (mapRef.current) {
+
+                            mapRef.current.flyTo({
+
+                              center: [analysis.lng, analysis.lat],
+
+                              zoom: 13,
+
+                              duration: 700,
+
+                            });
+
+                          }
+
+                        }}
+
+                      >
+
+                        <div className="comparison-site-info">
+
+                          <strong>{analysis.name}</strong>
+
+                          <span>{analysis.category}</span>
+
+                        </div>
+
+                        <div className="comparison-score">
+
+                          <strong>{Math.round(analysis.score)}</strong>
+
+                          <span>/100</span>
+
+                        </div>
+
+                      </button>
+
+                    ))
+
+                  )}
+
+                </div>
+
+              </div>
+
+            )}
 
             <div className="panel explanation">
 
@@ -1097,27 +1302,109 @@ function App() {
 
                 <Sparkles size={16} />
 
-                AI explanation
+                AI Site Intelligence
 
               </div>
 
+              {loadingRecommendation ? (
 
+                <p>Analyzing the selected location...</p>
 
-              <p>
+              ) : recommendation ? (
 
-                {loadingScore
+                <>
 
-                  ? "Analyzing the selected location..."
+                  <div className="ai-recommendation-header">
 
-                  : `${selectedSite.name} scores ${Math.round(
+                    <div>
 
-                      score
+                      <div className="ai-recommendation-category">
 
-                    )}/100 based on demand, accessibility, competitive whitespace,
+                        {recommendation.category}
 
-                    land-use suitability and environmental resilience.`}
+                      </div>
 
-              </p>
+                      <div className="ai-recommendation-score">
+
+                        {Math.round(recommendation.score)}
+
+                        <span>/100</span>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                  <p className="ai-recommendation-summary">
+
+                    {recommendation.summary}
+
+                  </p>
+
+                  {recommendation.strengths?.length > 0 && (
+
+                    <div className="ai-recommendation-section">
+
+                      <div className="ai-recommendation-section-title">
+
+                        <ShieldCheck size={14} />
+
+                        Strengths
+
+                      </div>
+
+                      <ul>
+
+                        {recommendation.strengths.map((item) => (
+
+                          <li key={item}>{item}</li>
+
+                        ))}
+
+                      </ul>
+
+                    </div>
+
+                  )}
+
+                  {recommendation.considerations?.length > 0 && (
+
+                    <div className="ai-recommendation-section">
+
+                      <div className="ai-recommendation-section-title">
+
+                        <Target size={14} />
+
+                        Considerations
+
+                      </div>
+
+                      <ul>
+
+                        {recommendation.considerations.map((item) => (
+
+                          <li key={item}>{item}</li>
+
+                        ))}
+
+                      </ul>
+
+                    </div>
+
+                  )}
+
+                </>
+
+              ) : (
+
+                <p>
+
+                  Select a site to generate an AI-powered site intelligence summary.
+
+                </p>
+
+              )}
 
             </div>
 
@@ -1132,8 +1419,6 @@ function App() {
   );
 
 }
-
-
 
 export default App;
 
