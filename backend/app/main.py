@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.services.scoring import SiteFactors, calculate_readiness
+from app.services.recommendation import build_recommendation
 from app.api.sites import router as sites_router
+from app.api.h3 import router as h3_router
 
 
 app = FastAPI(
@@ -59,4 +61,18 @@ def score_site(request: ScoreRequest):
     return calculate_readiness(factors)
 
 
+@app.post("/api/recommendation")
+def recommend_site(request: ScoreRequest):
+    factors = SiteFactors(
+        population=request.population,
+        accessibility=request.accessibility,
+        competition=request.competition,
+        land_use=request.land_use,
+        risk=request.risk,
+    )
+
+    return build_recommendation(factors)
+
+
 app.include_router(sites_router)
+app.include_router(h3_router)
