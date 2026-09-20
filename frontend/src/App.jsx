@@ -33,7 +33,6 @@ import {
 } from "lucide-react";
 
 import {
-  getSites,
   getH3Readiness,
   getSiteRecommendation,
   getSiteAnalyses,
@@ -225,6 +224,8 @@ function App() {
 
   // Load H3 site-readiness GeoJSON from the backend.
   useEffect(() => {
+    if (siteAnalyses.length === 0) return;
+
     async function loadH3Readiness() {
       try {
         const data = await getH3Readiness();
@@ -238,7 +239,7 @@ function App() {
     }
 
     loadH3Readiness();
-  }, []);
+  }, [siteAnalyses.length]);
 
   const selectedSite = sites.find((site) => site.id === selectedId);
 
@@ -273,53 +274,49 @@ function App() {
 
   });
 
-  // Create MapLibre map.
-
-  useEffect(() => {
-    async function loadOSMSites() {
-      try {
-        setOsmLoading(true);
-        setOsmError("");
-
-        const data = await getSites();
-
-        if (!data || !data.sites) {
-          throw new Error("Invalid OSM API response");
-        }
-
-        setOsmSites(data.sites);
-      } catch (error) {
-        console.error("Failed to load OSM site data:", error);
-        setOsmError("Unable to load OpenStreetMap data");
-      } finally {
-        setOsmLoading(false);
-      }
-    }
-
-    loadOSMSites();
-  }, []);
-
+  // Load OSM-derived site analysis once.
   useEffect(() => {
     let cancelled = false;
 
     async function loadSiteAnalyses() {
       setComparisonLoading(true);
+      setOsmLoading(true);
+      setOsmError("");
 
       try {
         const data = await getSiteAnalyses();
 
+        if (!data?.sites) {
+          throw new Error("Invalid site analysis response");
+        }
+
         if (!cancelled) {
-          setSiteAnalyses(data?.sites ?? []);
+          setSiteAnalyses(data.sites);
+
+          const osmMap = {};
+
+          data.sites.forEach((site) => {
+            const baseName = site.name.replace(/ [A-D]$/, "");
+
+            osmMap[baseName] = {
+              scores: site.osm,
+            };
+          });
+
+          setOsmSites(osmMap);
         }
       } catch (error) {
-        console.error("Site comparison API error:", error);
+        console.error("Site analysis API error:", error);
 
         if (!cancelled) {
           setSiteAnalyses([]);
+          setOsmSites({});
+          setOsmError("Unable to load OpenStreetMap data");
         }
       } finally {
         if (!cancelled) {
           setComparisonLoading(false);
+          setOsmLoading(false);
         }
       }
     }
@@ -330,6 +327,9 @@ function App() {
       cancelled = true;
     };
   }, []);
+
+  // Create MapLibre map.
+
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return;
@@ -570,7 +570,7 @@ function App() {
 
   useEffect(() => {
 
-    if (!selectedSite) return;
+    if (!selectedSite || siteAnalyses.length === 0) return;
 
     let cancelled = false;
 
@@ -596,20 +596,11 @@ function App() {
 
       try {
 
-        const [analysisResult, recommendationResult] =
+        const recommendationResult =
+          await getSiteRecommendation(factors);
 
-          await Promise.all([
-
-            getSiteAnalyses(),
-
-            getSiteRecommendation(factors),
-
-          ]);
-
-        const selectedAnalysis = analysisResult?.sites?.find(
-
+        const selectedAnalysis = siteAnalyses.find(
           (site) => site.id === selectedId
-
         );
 
         if (!cancelled) {
@@ -668,7 +659,7 @@ function App() {
 
     };
 
-  }, [selectedId, selectedSite]);
+  }, [selectedId, selectedSite, siteAnalyses]);
 
   const toggleLayer = (id) => {
 

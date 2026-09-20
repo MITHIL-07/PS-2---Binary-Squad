@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from .geospatial import calculate_site_features
 
 
@@ -37,6 +39,7 @@ def min_max(values: dict[str, float], inverse: bool = False):
     return result
 
 
+@lru_cache(maxsize=1)
 def build_osm_features():
     """
     Build normalized OSM-derived indicators
