@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
 import * as maplibregl from "maplibre-gl";
+import { setWorkerUrl } from "maplibre-gl";
+import maplibreWorker from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
+
+setWorkerUrl(maplibreWorker);
 
 import {
 
@@ -404,7 +408,7 @@ function App() {
           paint: {
             "fill-color": [
               "step",
-              ["get", "readiness"],
+              ["to-number", ["get", "readiness"]],
               "#ef4444",
               30,
               "#f59e0b",
