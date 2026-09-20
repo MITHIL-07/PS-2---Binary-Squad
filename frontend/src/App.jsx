@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+  import { useEffect, useRef, useState } from "react";
 
 import * as maplibregl from "maplibre-gl";
 
@@ -466,47 +466,6 @@ function App() {
           map.getCanvas().style.cursor = "";
         });
 
-        // Temporary diagnostic: force a highly visible color.
-        map.setPaintProperty(
-          "h3-readiness-fill",
-          "fill-color",
-          "#00ff00"
-        );
-        map.setPaintProperty(
-          "h3-readiness-fill",
-          "fill-opacity",
-          0.65
-        );
-
-        // Temporarily fit the map to the complete H3 dataset.
-        const coordinates = h3Data.features.flatMap(
-          (feature) =>
-            feature.geometry.coordinates[0]
-        );
-
-        const bounds = coordinates.reduce(
-          (bounds, coordinate) => {
-            return bounds.extend(coordinate);
-          },
-          new maplibregl.LngLatBounds(
-            coordinates[0],
-            coordinates[0]
-          )
-        );
-
-        map.fitBounds(bounds, {
-          padding: 40,
-          duration: 800,
-        });
-
-        map.once("idle", () => {
-          const rendered = map.queryRenderedFeatures({
-            layers: ["h3-readiness-fill"],
-          });
-
-          const source = map.getSource("h3-readiness");
-
-        });
       } else {
         map.getSource("h3-readiness").setData(h3Data);
       }
