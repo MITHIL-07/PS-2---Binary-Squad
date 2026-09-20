@@ -372,13 +372,24 @@ function App() {
     );
 
     map.on("load", () => {
-      map.resize();
-      setMapReady(true);
+      requestAnimationFrame(() => {
+        map.resize();
+        setMapReady(true);
+      });
     });
+
+    const handleResize = () => {
+      requestAnimationFrame(() => {
+        map.resize();
+      });
+    };
+
+    window.addEventListener("resize", handleResize);
 
     mapRef.current = map;
 
     return () => {
+      window.removeEventListener("resize", handleResize);
       map.remove();
       mapRef.current = null;
     };
@@ -393,9 +404,7 @@ function App() {
     }
 
     const renderH3 = () => {
-
       if (!map.getSource("h3-readiness")) {
-
         map.addSource("h3-readiness", {
           type: "geojson",
           data: h3Data,
@@ -429,62 +438,9 @@ function App() {
             "line-opacity": 0.7
           }
         });
-
-        map.on("click", "h3-readiness-fill", (event) => {
-          const feature = event.features?.[0];
-
-          if (!feature) return;
-
-          const p = feature.properties;
-
-          new maplibregl.Popup()
-            .setLngLat(event.lngLat)
-            .setHTML(`
-              <div style="font-family: sans-serif; min-width: 190px;">
-                <strong>H3 Site Readiness</strong>
-                <div style="margin-top: 8px;">
-                  <b>Readiness:</b> ${p.readiness}
-                </div>
-                <div>
-                  <b>Category:</b> ${p.category}
-                </div>
-                <div>
-                  <b>POIs:</b> ${p.poi_count}
-                </div>
-                <div>
-                  <b>Commercial:</b> ${p.commercial_pois}
-                </div>
-                <div>
-                  <b>Demand Activity:</b> ${p.demand_activity_pois}
-                </div>
-              </div>
-            `)
-            .addTo(map);
-        });
-
-        map.on("mouseenter", "h3-readiness-fill", () => {
-          map.getCanvas().style.cursor = "pointer";
-        });
-
-        map.on("mouseleave", "h3-readiness-fill", () => {
-          map.getCanvas().style.cursor = "";
-        });
-
       } else {
         map.getSource("h3-readiness").setData(h3Data);
       }
-
-      map.setPaintProperty(
-        "h3-readiness-fill",
-        "fill-opacity",
-        showH3 ? 0.48 : 0
-      );
-
-      map.setPaintProperty(
-        "h3-readiness-outline",
-        "line-opacity",
-        showH3 ? 0.7 : 0
-      );
     };
 
     if (map.loaded()) {
@@ -492,7 +448,96 @@ function App() {
     } else {
       map.once("load", renderH3);
     }
-  }, [h3Data, mapReady, showH3]);
+  }, [h3Data, mapReady]);
+
+  // Keep H3 visibility separate from H3 layer creation.
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (
+      !map ||
+      !mapReady ||
+      !map.getLayer("h3-readiness-fill") ||
+      !map.getLayer("h3-readiness-outline")
+    ) {
+      return;
+    }
+
+    map.setPaintProperty(
+      "h3-readiness-fill",
+      "fill-opacity",
+      showH3 ? 0.48 : 0
+    );
+
+    map.setPaintProperty(
+      "h3-readiness-outline",
+      "line-opacity",
+      showH3 ? 0.7 : 0
+    );
+  }, [showH3, mapReady]);
+
+  // Register H3 interaction handlers once.
+  useEffect(() => {
+    const map = mapRef.current;
+
+    if (
+      !map ||
+      !mapReady ||
+      !map.getLayer("h3-readiness-fill")
+    ) {
+      return;
+    }
+
+    const handleClick = (event) => {
+      const feature = event.features?.[0];
+
+      if (!feature) return;
+
+      const p = feature.properties;
+
+      new maplibregl.Popup()
+        .setLngLat(event.lngLat)
+        .setHTML(`
+          <div style="font-family: sans-serif; min-width: 190px;">
+            <strong>H3 Site Readiness</strong>
+            <div style="margin-top: 8px;">
+              <b>Readiness:</b> ${p.readiness}
+            </div>
+            <div>
+              <b>Category:</b> ${p.category}
+            </div>
+            <div>
+              <b>POIs:</b> ${p.poi_count}
+            </div>
+            <div>
+              <b>Commercial:</b> ${p.commercial_pois}
+            </div>
+            <div>
+              <b>Demand Activity:</b> ${p.demand_activity_pois}
+            </div>
+          </div>
+        `)
+        .addTo(map);
+    };
+
+    const handleMouseEnter = () => {
+      map.getCanvas().style.cursor = "pointer";
+    };
+
+    const handleMouseLeave = () => {
+      map.getCanvas().style.cursor = "";
+    };
+
+    map.on("click", "h3-readiness-fill", handleClick);
+    map.on("mouseenter", "h3-readiness-fill", handleMouseEnter);
+    map.on("mouseleave", "h3-readiness-fill", handleMouseLeave);
+
+    return () => {
+      map.off("click", "h3-readiness-fill", handleClick);
+      map.off("mouseenter", "h3-readiness-fill", handleMouseEnter);
+      map.off("mouseleave", "h3-readiness-fill", handleMouseLeave);
+    };
+  }, [mapReady, h3Data]);
 
   // Update markers whenever the selected site changes.
 
