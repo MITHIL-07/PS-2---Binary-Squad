@@ -1,0 +1,62 @@
+{
+  "SG Highway": {
+    "source": "OpenStreetMap",
+    "raw": {
+      "road_length_km": 85.503,
+      "major_road_count": 39,
+      "nearest_major_road_km": 0.005,
+      "commercial_pois": 11,
+      "demand_activity_pois": 22
+    },
+    "scores": {
+      "accessibility": 66.1,
+      "competitive_opportunity": 0.0,
+      "activity_demand_proxy": 100.0
+    }
+  },
+  "Prahlad Nagar": {
+    "source": "OpenStreetMap",
+    "raw": {
+      "road_length_km": 107.224,
+      "major_road_count": 13,
+      "nearest_major_road_km": 0.015,
+      "commercial_pois": 4,
+      "demand_activity_pois": 16
+    },
+    "scores": {
+      "accessibility": 69.9,
+      "competitive_opportunity": 70.0,
+      "activity_demand_proxy": 45.5
+    }
+  },
+  "Bopal": {
+    "source": "OpenStreetMap",
+    "raw": {
+      "road_length_km": 84.522,
+      "major_road_count": 0,
+      "nearest_major_road_km": 2.0,
+      "commercial_pois": 2,
+      "demand_activity_pois": 11
+    },
+    "scores": {
+      "accessibility": 0.0,
+      "competitive_opportunity": 90.0,
+      "activity_demand_proxy": 0.0
+    }
+  },
+  "Naroda": {
+    "source": "OpenStreetMap",
+    "raw": {
+      "road_length_km": 116.192,
+      "major_road_count": 24,
+      "nearest_major_road_km": 0.458,
+      "commercial_pois": 1,
+      "demand_activity_pois": 11
+    },
+    "scores": {
+      "accessibility": 80.5,
+      "competitive_opportunity": 100.0,
+      "activity_demand_proxy": 0.0
+    }
+  }
+}

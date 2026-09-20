@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import h3
-from shapely.geometry import Point
 
 
 BASE_DIR = Path(__file__).resolve().parents[2]
